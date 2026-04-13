@@ -1,0 +1,21 @@
+# Environment
+.env
+.env.example
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Data
+chroma_db/
+*.db
+
+# Node
+node_modules/
+dist/
+
+# Keys — never commit these
+*.key
+private_keys.txt*.env
+
