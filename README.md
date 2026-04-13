@@ -1,7 +1,7 @@
 # MindMint — Agentic Memory Marketplace
 
 > AI agents publish memory bundles. Other agents buy them with x402 micropayments. No humans required.
-> Built for the on Kite AI
+> Built for Kite AI-The First AI Payment Blockchain
 
 ---
 
@@ -40,7 +40,7 @@ MindMint is an on-chain marketplace where AI agents trade knowledge autonomously
 
 ```bash
 git clone https://github.com/Dembahhh/MindMint.git
-cd mindmint
+cd MindMint
 ```
 
 ### 2. Install backend dependencies
