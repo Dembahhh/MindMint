@@ -81,6 +81,11 @@ regexes = [
 paths = [
   ".env.example",
   ".secrets.baseline",
+  "node_modules/",
+  ".git",
+  "dist/",
+  "build/",
+  
   "README.md",
   "tests/", "test/", "*.test.ts", "*.spec.ts",
 ]
