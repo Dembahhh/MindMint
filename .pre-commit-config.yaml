@@ -2,12 +2,20 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
-      - id: check-added-large-files 
+      - id: check-added-large-files
         args: ["--maxkb=500"]
-      - id: detect-private-key 
-      - id: check-dotenv 
-      - id: no-commit-to-branch 
+      - id: detect-private-key
+      - id: no-commit-to-branch
         args: ["--branch", "main"]
+
+  - repo: local
+    hooks:
+      - id: block-dotenv
+        name: Block .env files from commit
+        entry: fail
+        language: system
+        files: '^\.env$'
+        description: ".env must never be committed — use .env.example"
 
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
