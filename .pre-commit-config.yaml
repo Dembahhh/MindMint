@@ -12,8 +12,8 @@ repos:
     hooks:
       - id: block-dotenv
         name: Block .env files from commit
-        entry: fail
-        language: system
+        entry: ".env files must never be committed — use .env.example"
+        language: fail
         files: '^\.env$'
         description: ".env must never be committed — use .env.example"
 
@@ -36,3 +36,4 @@ repos:
     hooks:
       - id: gitleaks
         args: ["--staged","--config", ".gitleaks.toml"]
+        stages: [pre-push]
