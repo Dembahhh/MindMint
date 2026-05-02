@@ -22,5 +22,4 @@ dist/
 #keys
 *.pem
 *.key
-private_keys.txt*.env
-
+private_keys.txt
