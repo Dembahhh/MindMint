@@ -11,6 +11,7 @@ for AgentMemory is confirmed working.
 """
 
 import asyncio
+import dotenv
 import httpx
 import json
 import base64
@@ -19,10 +20,11 @@ from eth_account.messages import encode_defunct
 from web3 import Web3
 from dotenv import load_dotenv
 import rootutils  
+from pathlib import Path
 import os
 import sys
 
-root = rootutils.find_root(__file__, indicator=".env")
+root = rootutils.setup_root(search_from=__file__, indicator=".env", pythonpath=True, dotenv=True)
 load_dotenv(dotenv_path=root / ".env")
 
 print("KEY loaded:", bool(os.getenv("CONSUMER_PRIVATE_KEY")))

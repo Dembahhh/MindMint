@@ -26,7 +26,7 @@ from eth_account.messages import encode_defunct
 import rootutils
 from web3 import Web3
 
-root= rootutils.find_root(__file__, indicator=".env")
+root = rootutils.setup_root(search_from=__file__, indicator=".env", pythonpath=True, dotenv=True)
 _ENV_FILE = root / ".env"
 load_dotenv(_ENV_FILE)
 
