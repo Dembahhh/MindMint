@@ -39,7 +39,7 @@ def generate_wallet(name: str) -> WalletInfo:
     """
     PRIVATE_KEY_BYTES = 32  # 256 bits for EVM private key
     try:
-        private_key = "0x" + secrets.token_hex(PRIVATE_KEY_BYTES)
+        private_key = "0x" + secrets.token_hex(PRIVATE_KEY_BYTES) #pragma: allowlist secret
         account= Account.from_key(private_key)
     except  ValueError as e:
         raise ValueError(f"Failed to generate wallet for {name}: {e}") from e
