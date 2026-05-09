@@ -1,23 +1,22 @@
-pre-commit==3.7.1
-fastapi==0.115.0
-uvicorn[standard]==0.30.0
-python-dotenv==1.0.1
-httpx==0.27.0
-pydantic==2.7.0
-pydantic-settings>=2.2.0
+fastapi
+uvicorn[standard]
 
-motor==3.4.0
 beanie==1.26.0
-chromadb==0.4.24
+motor==3.3.2
+pymongo==4.6.3
 
-crewai==0.51.0
-crewai-tools==0.8.3
-google-generativeai==0.7.2
+chromadb==1.0.0
 
-web3==6.20.0
-eth-account==0.11.3
+httpx
 
-aiohttp==3.9.5
-python-multipart==0.0.9
-project-root==0.30
-rootutils==1.0.7
+pydantic
+pydantic-settings
+
+google-generativeai
+google-api-core
+
+eth-account
+
+nh3==0.2.15
+
+python-dotenv

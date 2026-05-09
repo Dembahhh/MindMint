@@ -17,7 +17,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Resolve .env relative to the project root (one level up from backend/)
+# Resolve .env relative to the project root
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 class KiteConfig(BaseModel):
@@ -25,7 +25,7 @@ class KiteConfig(BaseModel):
     chain_id: Annotated[int, Field(gt=0)] = 2368
     api_base_url: str = "https://api.testnet.gokite.ai"
     facilitator_url: str = "https://x402.testnet.gokite.ai/facilitator"
-    testnet: bool = False
+    is_testnet: bool = True
     
     # Get the exact address from: docs.gokite.ai/kite-chain
     usdc_contract_address: str
@@ -39,16 +39,19 @@ class LLMConfig(BaseModel):
     api_key: SecretStr
     model: str = "gemini-1.5-flash"
     embedding_model: str = "models/text-embedding-004"
+    embedding_dim: int = 768
 class DatabaseConfig(BaseModel):   
     mongo_db_url: str = "mongodb://localhost:27017"
     mongodb_db_name: str = "agentmemory"
     chroma_host: str = "localhost"
-    chroma_port: Annotated[int, Field(gt=0, lt=65536)] = 8001
+    chroma_port: Annotated[int, Field(gt=0, lt=65536)] = 8000
     chroma_collection_name: str = "memory_bundles"
+    chroma_doc_max_length: int = 500
     
 class MarketplaceConfig(BaseModel):
     memory_base_price_usdc: Annotated[float, Field(gt=0)] = 0.002
     publisher_royalty_percent: Annotated[float, Field(ge=0, le=1)]= 0.80
+    quality_threshold: Annotated[float, Field(ge=0.0, le=1.0)] = 0.5
 class APIConfig(BaseModel):
     port: Annotated[int, Field(gt=0, lt=65536)] = 8000
     host: str = "0.0.0.0"
@@ -60,7 +63,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         env_nested_delimiter="__",
-        extra="ignore",   # allow extra env vars without crashing
+        extra="ignore",   
     )
     kite: KiteConfig
     publisher: WalletConfig
@@ -98,7 +101,7 @@ if __name__ == "__main__":
     logger.info("   Kite RPC:          %s", s.kite.rpc_url)
     logger.info("   Chain ID:          %s", s.kite.chain_id)
     logger.info("   Facilitator URL:   %s", s.kite.facilitator_url)
-    logger.info("   Testnet:           %s", s.kite.testnet)
+    logger.info("   Testnet:           %s", s.kite.is_testnet)
     logger.info("   Publisher Wallet:  %s", s.publisher.address)
     logger.info("   Consumer Wallet:   %s", s.consumer.address)
     logger.info("   MongoDB:           %s", s.database.mongo_db_url)
@@ -109,4 +112,8 @@ if __name__ == "__main__":
     logger.info("   Chroma Collection: %s", s.database.chroma_collection_name)
     logger.info("   Memory Base Price: %s", s.marketplace.memory_base_price_usdc)
     logger.info("   Publisher Royalty: %s", s.marketplace.publisher_royalty_percent)
+    logger.info("   Embedding Model:   %s", s.llm.embedding_model)
+    logger.info("   Quality Threshold: %s", s.marketplace.quality_threshold)
     logger.info("\n All required variables present.")
+
+settings = get_settings()    
