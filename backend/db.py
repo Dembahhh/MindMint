@@ -16,7 +16,7 @@ from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
-_mongo_client: Optional[AsyncIOMotorClient] = None #quote for forward reference
+_mongo_client: Optional[AsyncIOMotorClient] = None #type: ignore[valid-type]
 
 async def init_db() -> None:
     """Initialise MongoDB connection and Beanie ODM with retry logic."""
