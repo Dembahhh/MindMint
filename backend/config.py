@@ -17,7 +17,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Resolve .env relative to the project root
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 class KiteConfig(BaseModel):
@@ -27,7 +26,6 @@ class KiteConfig(BaseModel):
     facilitator_url: str = "https://x402.testnet.gokite.ai/facilitator"
     is_testnet: bool = True
     
-    # Get the exact address from: docs.gokite.ai/kite-chain
     usdc_contract_address: str
     
 class WalletConfig(BaseModel):
@@ -56,6 +54,13 @@ class APIConfig(BaseModel):
     port: Annotated[int, Field(gt=0, lt=65536)] = 8000
     host: str = "0.0.0.0"
     debug: bool = False
+class AgentConfig(BaseModel):
+    similarity_threshold: Annotated[float, Field(ge=0.0, le=1.0)] = 0.70
+    quality_threshold: Annotated[float, Field(ge=0.0, le=1.0)] = 0.55
+    max_bundles_per_run: Annotated[int, Field(gt=0)] = 3
+    max_budget_usdc: Annotated[float, Field(gt=0)] = 0.01
+    api_base_url: str = "http://localhost:8080"
+    max_concurrent_runs: Annotated[int, Field(gt=0)] = 3
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -63,7 +68,8 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         env_nested_delimiter="__",
-        extra="ignore",   
+        extra="ignore",  
+
     )
     kite: KiteConfig
     publisher: WalletConfig
@@ -72,6 +78,7 @@ class Settings(BaseSettings):
     database: DatabaseConfig = DatabaseConfig()
     marketplace: MarketplaceConfig = MarketplaceConfig()
     api: APIConfig = APIConfig()
+    agent: AgentConfig = AgentConfig()
 
     # Top-level env vars (not nested)
     demo_api_key: Optional[str] = None
@@ -95,7 +102,7 @@ def get_settings() -> Settings:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO
                         , format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    # Run this file directly to verify all config loads correctly
+
     s = get_settings()
     logger.info("Config loaded successfully")
     logger.info("   Kite RPC:          %s", s.kite.rpc_url)
@@ -114,6 +121,10 @@ if __name__ == "__main__":
     logger.info("   Publisher Royalty: %s", s.marketplace.publisher_royalty_percent)
     logger.info("   Embedding Model:   %s", s.llm.embedding_model)
     logger.info("   Quality Threshold: %s", s.marketplace.quality_threshold)
+    logger.info("   Agent API Base URL:        %s", s.agent.api_base_url)
+    logger.info("   Agent Similarity Threshold: %s", s.agent.similarity_threshold)
+    logger.info("   Agent Max Bundles/Run:      %s", s.agent.max_bundles_per_run)
+    logger.info("   Agent Max Concurrent Runs:  %s", s.agent.max_concurrent_runs)
     logger.info("\n All required variables present.")
 
 settings = get_settings()    

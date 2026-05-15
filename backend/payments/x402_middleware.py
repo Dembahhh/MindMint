@@ -17,7 +17,7 @@ How x402 works (simplified):
   6. If invalid: return 402 again with error detail
 
 This middleware does NOT intercept every request.
-Only routes that call `require_payment(request)` trigger the gate.
+Only routes prefixed with PAID_ROUTE_PREFIXES trigger the gate.
 All other routes pass through untouched.
 """
 
@@ -26,8 +26,8 @@ import json
 import logging
 import time
 from decimal import Decimal
-
 from typing import Any
+
 import httpx
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -39,32 +39,34 @@ logger = logging.getLogger(__name__)
 
 PAID_ROUTE_PREFIXES: tuple[str, ...] = ("/memory/purchase",)
 
+
 def _to_microunits(usdc_amount: float) -> int:
     """Convert USDC float to integer microunits. Uses Decimal to avoid float truncation."""
     return int(Decimal(str(usdc_amount)) * 1_000_000)
+
 
 class X402PaymentMiddleware(BaseHTTPMiddleware):
     """
     Intercepts requests to paid routes.
     Checks for X-PAYMENT header and verifies payment.
     """
-    
+
     async def dispatch(self, request: Request, call_next) -> Response:
         path = request.url.path
-        
+
         if not any(path.startswith(prefix) for prefix in PAID_ROUTE_PREFIXES):
             return await call_next(request)
-        
+
         logger.info("[x402] Payment gate triggered for: %s", path)
-        
+
         payment_header = request.headers.get("X-PAYMENT")
-        
+
         if not payment_header:
             logger.info("[x402] No payment header. Returning 402.")
             return self._build_402_response(request)
-        
+
         verification = await self._verify_payment(payment_header, request)
-        
+
         if not verification["valid"]:
             logger.warning("[x402] Payment invalid: %s", verification.get("error"))
             return JSONResponse(
@@ -75,37 +77,38 @@ class X402PaymentMiddleware(BaseHTTPMiddleware):
                     "x402Version": 1
                 }
             )
-        
+
         request.state.payment = {
             "tx_hash": verification.get("txHash"),
             "amount_microunits": _to_microunits(verification.get("amountUsdc", 0)),
             "payer": verification.get("payer"),
             "verified_at": time.time()
         }
-        
+        request.state.consumer_wallet = verification.get("payer", "unknown")
+
         logger.info(
             "[x402] Payment verified. TX: %s, Amount: $%s USDC",
             verification.get("txHash", "")[:20],
             verification.get("amountUsdc")
         )
-        
+
         response = await call_next(request)
-        
+
         if verification.get("txHash"):
             response.headers["X-PAYMENT-RESPONSE"] = verification["txHash"]
-        
+
         return response
-    
+
     def _build_402_response(self, request: Request) -> JSONResponse:
         """
         Builds the standard x402 payment-required response.
-        
+
         The client reads this to know how much to pay, who to pay,
         and in what format to sign the payment.
         """
         price_usdc = settings.marketplace.memory_base_price_usdc
         price_microunits = _to_microunits(price_usdc)
-        
+
         return JSONResponse(
             status_code=402,
             content={
@@ -133,7 +136,7 @@ class X402PaymentMiddleware(BaseHTTPMiddleware):
                 "Access-Control-Expose-Headers": "X-PAYMENT-RESPONSE"
             }
         )
-    
+
     async def _verify_payment(
         self,
         payment_header: str,
@@ -141,30 +144,30 @@ class X402PaymentMiddleware(BaseHTTPMiddleware):
     ) -> dict[str, Any]:
         """
         Verifies a payment by calling the Kite x402 facilitator.
-        
+
         The facilitator is a Kite-operated service that:
         1. Decodes the signed payment authorisation
         2. Checks the signature is valid
         3. Submits the USDC transferWithAuthorization on-chain
         4. Returns the transaction hash once mined
-        
-        If the facilitator is unavailable (testnet issue), we fall back
-        to local signature verification as a development bypass.
+
+        If the facilitator is unavailable, falls back to local
+        signature verification as a development bypass.
         """
         try:
             decoded = base64.b64decode(payment_header.encode()).decode()
             payment_payload = json.loads(decoded)
         except Exception as e:
             return {"valid": False, "error": f"Could not decode payment header: {e}"}
-        
+
         if payment_payload.get("x402Version") != 1:
             return {"valid": False, "error": "Unsupported x402 version"}
-        
+
         if payment_payload.get("network") != "kite-testnet":
             return {"valid": False, "error": "Wrong network"}
-        
+
         logger.info("[x402] Verifying payment with Kite facilitator...")
-        
+
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 verify_response = await client.post(
@@ -182,7 +185,7 @@ class X402PaymentMiddleware(BaseHTTPMiddleware):
                         }
                     }
                 )
-                
+
                 if verify_response.status_code == 200:
                     result = verify_response.json()
                     return {
@@ -197,14 +200,14 @@ class X402PaymentMiddleware(BaseHTTPMiddleware):
                         verify_response.status_code,
                         verify_response.text[:200]
                     )
-                    
+
         except httpx.TimeoutException:
             logger.warning("[x402] Facilitator timeout. Using local verification.")
         except Exception as e:
             logger.warning("[x402] Facilitator error: %s. Using local verification.", e)
-        
+
         return await self._local_verify_fallback(payment_payload)
-    
+
     async def _local_verify_fallback(self, payment_payload: dict) -> dict:
         """
         Development bypass — used when Kite facilitator is unreachable.

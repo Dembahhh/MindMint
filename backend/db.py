@@ -24,6 +24,7 @@ async def init_db() -> None:
 
     from backend.payments.models import PaymentRecord
     from backend.memory.bundle import MemoryBundle
+    from backend.payments.royalty import RoyaltyPayment
 
     for attempt in range(1, 6):
         try:
@@ -45,7 +46,7 @@ async def init_db() -> None:
     try:
         await init_beanie(
             database=_mongo_client[settings.database.mongodb_db_name],
-            document_models=[MemoryBundle, PaymentRecord]
+            document_models=[MemoryBundle, PaymentRecord, RoyaltyPayment]
         )
         logger.info("Beanie ODM initialised with %s", settings.database.mongodb_db_name)
     except Exception as e:
