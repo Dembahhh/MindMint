@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design tokens ────────────────────────────────────────────────────────── */
+
+:root {
+  --color-base:     #030712;
+  --color-surface:  #111827;
+  --color-elevated: #1f2937;
+
+  --color-accent:       #9333ea;
+  --color-accent-hover: #a855f7;
+  --color-accent-subtle:#c084fc;
+
+  --color-success:        #4ade80;
+  --color-warning:        #facc15;
+  --color-danger:         #f87171;
+  --color-danger-surface: rgba(127, 29, 29, 0.30);
+  --color-danger-border:  #991b1b;
+
+  --color-ink-primary:   #f9fafb;
+  --color-ink-secondary: #9ca3af;
+  --color-ink-muted:     #6b7280;
+  --color-ink-faint:     #4b5563;
+
+  --color-line:       #1f2937;
+  --color-line-strong:#374151;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-base:     #f9fafb;
+    --color-surface:  #ffffff;
+    --color-elevated: #f3f4f6;
+
+    --color-accent:       #7c3aed;
+    --color-accent-hover: #6d28d9;
+    --color-accent-subtle:#7c3aed;
+
+    --color-success:        #16a34a;
+    --color-warning:        #d97706;
+    --color-danger:         #dc2626;
+    --color-danger-surface: rgba(254, 226, 226, 0.60);
+    --color-danger-border:  #fca5a5;
+
+    --color-ink-primary:   #111827;
+    --color-ink-secondary: #4b5563;
+    --color-ink-muted:     #6b7280;
+    --color-ink-faint:     #9ca3af;
+
+    --color-line:       #e5e7eb;
+    --color-line-strong:#d1d5db;
+  }
+}
+
+/* ── Base reset ───────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-base);
+  color: var(--color-ink-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Keyboard users see the ring. Mouse users don't. */
+:focus-visible {
+  outline: 2px solid var(--color-accent-subtle);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}

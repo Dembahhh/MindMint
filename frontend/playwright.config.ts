@@ -17,7 +17,7 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
-  // Start the frontend dev server when running tests locally
+  
   webServer: {
     command: 'npm install && npm run dev',
     url: 'http://localhost:5173',
