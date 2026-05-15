@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: mindmint-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE__MONGO_DB_URL
+        sync: false
+      - key: DATABASE__MONGODB_DB_NAME
+        value: agentmemory
+      - key: DATABASE__CHROMA_HOST
+        sync: false
+      - key: DATABASE__CHROMA_PORT
+        value: "8001"
+      - key: LLM__API_KEY
+        sync: false
+      - key: LLM__MODEL
+        value: gemini-1.5-flash
+      - key: KITE__RPC_URL
+        value: https://rpc-testnet.gokite.ai
+      - key: KITE__CHAIN_ID
+        value: "2368"
+      - key: KITE__FACILITATOR_URL
+        value: https://x402.testnet.gokite.ai/facilitator
+      - key: KITE__IS_TESTNET
+        value: "true"
+      - key: KITE__USDC_CONTRACT_ADDRESS
+        sync: false
+      - key: PUBLISHER__ADDRESS
+        sync: false
+      - key: PUBLISHER__PRIVATE_KEY
+        sync: false
+      - key: CONSUMER__ADDRESS
+        sync: false
+      - key: CONSUMER__PRIVATE_KEY
+        sync: false
+      - key: MARKETPLACE__PUBLISHER_ROYALTY_PERCENT
+        value: "0.80"
+      - key: MARKETPLACE__MEMORY_BASE_PRICE_USDC
+        value: "0.002"
+      - key: DEMO_API_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
