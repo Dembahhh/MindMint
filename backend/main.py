@@ -23,7 +23,7 @@ import google.generativeai as genai
 from backend.config import settings
 from backend.payments.x402_middleware import X402PaymentMiddleware
 from backend.db import init_db, close_db
-from backend.routes import memory_router, agent_router
+from backend.routes import memory_router, agent_router, consumer_router, dashboard_router
 from backend.memory.store import MemoryStore
 
 
@@ -92,7 +92,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",   
         "http://localhost:3000",  
-        "https://MindMint.up.railway.app",  
+        settings.frontend_url or "",  
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
@@ -103,6 +103,8 @@ app.add_middleware(X402PaymentMiddleware)
 
 app.include_router(memory_router, prefix="/memory", tags=["Memory"])
 app.include_router(agent_router, prefix="/agent", tags=["Agent"])
+app.include_router(consumer_router, prefix="/agent/consumer", tags=["Consumer Agent"])
+app.include_router(dashboard_router, prefix="/dashboard", tags=["Dashboard"])
 
 
 @app.get("/health")
