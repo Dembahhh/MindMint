@@ -1,0 +1,90 @@
+# .gitleaks.toml
+# Custom gitleaks rules for MindMint
+# Extends built-in rules with MindMint-specific patterns
+
+title = "MindMint Gitleaks Config"
+
+[extend]
+# Use gitleaks default rules as the base
+useDefault = true
+
+[[rules]]
+id = "ethereum-private-key"
+description = "Raw Ethereum private key (0x + 64 hex chars)"
+regex = '''(?i)(private[_-]?key|priv[_-]?key|secret[_-]?key)[^=]*=\s*['"]?0x[0-9a-fA-F]{64}['"]?'''
+severity = "CRITICAL"
+tags = ["wallet", "ethereum", "key"]
+
+[[rules]]
+id = "bare-ethereum-private-key"
+description = "Bare 0x Ethereum private key (64 hex chars after 0x)"
+regex = '''(?i)(key|secret|private|priv|wallet|pk)\s*[=:]\s*['"]?0x[0-9a-fA-F]{64}['"]?'''
+severity = "CRITICAL"
+tags = ["wallet", "ethereum"]
+
+[[rules]]
+id = "mongodb-atlas-url"
+description = "MongoDB Atlas connection string with embedded credentials"
+regex = '''mongodb(\+srv)?:\/\/[^:]+:[^@]+@[^/]+'''
+severity = "HIGH"
+tags = ["database", "mongodb"]
+
+[[rules]]
+id = "gemini-api-key"
+description = "Google Gemini / AI Platform API key"
+regex = '''AIza[0-9A-Za-z\-_]{35}'''
+severity = "HIGH"
+tags = ["api-key", "google", "gemini"]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic Claude API key"
+regex = '''sk-ant-api03-[a-zA-Z0-9\-_]{93}'''
+severity = "CRITICAL"
+tags = ["api-key", "anthropic", "llm"]
+
+[[rules]]
+id = "mindmint-demo-api-key"
+description = "MindMint DEMO_API_KEY assigned inline"
+regex = '''(?i)demo[_-]?api[_-]?key[^=]*=\s*['"]?[a-zA-Z0-9\-_]{16,}['"]?'''
+severity = "MEDIUM"
+tags = ["api-key", "mindmint"]
+
+[[rules]]
+id = "groq-api-key"
+description = "Groq API key (gsk_ prefix)"
+regex = '''gsk_[a-zA-Z0-9]{52}'''
+severity = "HIGH"
+tags = ["api-key", "groq", "llm"]
+
+[[rules]]
+id = "vite-api-key"
+description = "VITE_API_KEY hardcoded in frontend source"
+regex = '''VITE_API_KEY\s*=\s*['"][a-zA-Z0-9\-_\.]{20,}['"]'''
+severity = "MEDIUM"
+tags = ["api-key", "frontend"]
+
+[allowlist]
+description = "Safe patterns to ignore"
+regexes = [
+  # Example/placeholder values in docs and .env.example
+  '''0x[0]{64}''',
+  '''your-key|placeholder|change-me|getpass|<.*>|YOUR_API|your-passport-uuid''',
+  '''localhost''',
+  '''0x\.\.\.''',
+  '''txHash|transactionHash|blockHash'''
+]
+# Files safe to skip
+paths = [
+  '''\.env\.example''',
+  '''\.secrets\.baseline''',
+  '''node_modules/''',
+  '''\.git/''',
+  '''dist/''',
+  '''build/''',
+  '''README\.md''',
+  '''tests/''',
+  '''test/''',
+  '''.*\.test\.ts$''',
+  '''.*\.spec\.ts$''',
+]

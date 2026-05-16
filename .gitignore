@@ -1,5 +1,9 @@
 # Environment
 .env
+.env.local
+.env.production
+.env.development
+.env.test
 .env.example
 venv/
 __pycache__/
@@ -7,15 +11,16 @@ __pycache__/
 *.pyo
 .DS_Store
 
-# Data
+#data
 chroma_db/
 *.db
 
-# Node
+#node
 node_modules/
 dist/
 
-# Keys — never commit these
+#keys
+*.pem
 *.key
-private_keys.txt*.env
-
+private_keys.txt
+copilot-instructions.md
