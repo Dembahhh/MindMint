@@ -14,6 +14,7 @@ import logging
 from backend.config import settings
 from backend.payments.models import PaymentRecord
 from backend.utils.sanitize import sanitize_text, sanitize_list
+from backend.payments.royalty import royalty_engine
 
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
@@ -35,7 +36,6 @@ class BundlePreview(BaseModel):
     price_microunits: int
     quality_score: Optional[float] = None
     tags: list[str] = []
-
 
 
 @router.get("/list")
@@ -116,7 +116,6 @@ async def bundle_info(bundle_id: str, request: Request) -> dict[str, Any]:
     }
 
 
-
 @router.get("/purchase/{bundle_id}")
 async def purchase_bundle(bundle_id: str, request: Request) -> dict[str, Any]:
     """
@@ -131,7 +130,10 @@ async def purchase_bundle(bundle_id: str, request: Request) -> dict[str, Any]:
     payer = payment.get("payer")
     if not payer:
         logger.error("Payer address missing. TX: %s", payment.get("tx_hash"))
-        raise HTTPException(status_code=500, detail="Payment verification incomplete — payer address missing")
+        raise HTTPException(
+            status_code=500,
+            detail="Payment verification incomplete — payer address missing"
+        )
 
     store = request.app.state.memory_store
     bundle = await store.get_bundle(bundle_id)
@@ -141,19 +143,27 @@ async def purchase_bundle(bundle_id: str, request: Request) -> dict[str, Any]:
     if not bundle.is_active:
         raise HTTPException(status_code=410, detail="This bundle has been delisted")
 
-    logger.info(
-        "Bundle '%s' purchased by %s (TX: %s)",
-        bundle.title,
-        payer[:20],
-        payment.get("tx_hash", "")[:20]
-    )
-
     existing = await PaymentRecord.find_one(PaymentRecord.tx_hash == payment["tx_hash"])
     if existing:
         raise HTTPException(
             status_code=409,
             detail="This transaction has already been used to purchase a bundle"
         )
+    try:
+        await record.insert()
+        await store.increment_purchase_count(bundle_id) 
+    except Exception as e:
+        logger.error("Failed to record payment for bundle %s: %s", bundle_id, e)
+        raise HTTPException(
+            status_code=500,
+            detail="Receipt save failed. Contact support with your transaction hash."
+    )
+    await royalty_engine.distribute(
+        bundle_id=bundle_id,
+        publisher_wallet=bundle.publisher_wallet,
+        consumer_wallet=payer,
+        gross_amount_microunits=bundle.price_microunits
+    )
 
     record = PaymentRecord(
         bundle_id=bundle_id,
@@ -167,17 +177,26 @@ async def purchase_bundle(bundle_id: str, request: Request) -> dict[str, Any]:
         await record.insert()
         await store.increment_purchase_count(bundle_id)
     except Exception as e:
-        logger.error("Failed to record payment for bundle %s TX %s: %s",
-                     bundle_id, payment.get("tx_hash", ""), e)
+        logger.error(
+            "Failed to record payment for bundle %s TX %s: %s",
+            bundle_id, payment.get("tx_hash", ""), e
+        )
         raise HTTPException(
             status_code=500,
             detail="Payment recorded on-chain but receipt save failed. Contact support with your transaction hash."
         )
 
+    logger.info(
+        "Bundle '%s' purchased by %s (TX: %s)",
+        bundle.title,
+        payer[:20],
+        payment.get("tx_hash", "")[:20]
+    )
 
     return {
         "bundle_id": bundle.bundle_id,
         "title": bundle.title,
+        "description": bundle.description,
         "payment": {
             "tx_hash": payment["tx_hash"],
             "amount_microunits": payment["amount_microunits"],
@@ -186,7 +205,7 @@ async def purchase_bundle(bundle_id: str, request: Request) -> dict[str, Any]:
         "content": {
             "memories": [
                 {
-                    "id": m.memory_id,
+                    "memory_id": m.memory_id,
                     "text": m.text,
                     "quality_score": m.quality_score,
                     "tags": m.tags,
@@ -200,21 +219,25 @@ async def purchase_bundle(bundle_id: str, request: Request) -> dict[str, Any]:
     }
 
 
-
 async def _verify_publisher_key(key: str = Security(_api_key_header)) -> None:
     """Simple API key guard for the publish endpoint."""
+    if settings.environment == "development":
+        return
     if not settings.demo_api_key:
-        return  
+        raise HTTPException(status_code=500, detail="Demo API key not configured on server")
     if key != settings.demo_api_key:
         raise HTTPException(status_code=403, detail="Invalid API key")
 
 
-
 @router.post("/publish")
-async def publish_bundle(req: PublishRequest, request: Request, _: None = Depends(_verify_publisher_key)) -> dict[str, Any]:
+async def publish_bundle(
+    req: PublishRequest,
+    request: Request,
+    _: None = Depends(_verify_publisher_key)
+) -> dict[str, Any]:
     """
     Publisher endpoint: submits raw memories for quality scoring,
-    embedding, and storage. Open for hackathon — add auth in production.
+    embedding, and storage.
     """
     if len(req.memories) == 0:
         raise HTTPException(status_code=400, detail="memories list cannot be empty")
