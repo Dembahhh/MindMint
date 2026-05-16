@@ -1,7 +1,7 @@
 """
 test_server_payment.py
 
-Integration test: hits the live AgentMemory server and makes a real
+Integration test: hits the live MindMint server and makes a real
 x402 payment through it.
 
 Prerequisites:
@@ -19,27 +19,57 @@ What it tests:
 """
 
 import asyncio
-import httpx
-import json
 import base64
-import time
+import json
+import os
 import secrets
 import sys
-from eth_account import Account
+import time
+import logging
+
+import httpx
 from dotenv import load_dotenv
-import os
+from eth_account import Account
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 
 load_dotenv()
 
-SERVER_URL = "http://localhost:8000"
-CONSUMER_KEY = os.getenv("CONSUMER_PRIVATE_KEY")
-CONSUMER_ADDRESS = os.getenv("CONSUMER_WALLET_ADDRESS")
-USER_CONTRACT = os.getenv("USDC_CONTRACT_ADDRESS")
-CHAIN_ID = int(os.getenv("KITE_CHAIN_ID", 2368))
+SERVER_URL = os.getenv("SERVER_URL", "http://localhost:8080")
+CONSUMER_KEY = os.getenv("CONSUMER__PRIVATE_KEY")
+CONSUMER_ADDRESS = os.getenv("CONSUMER__ADDRESS")
+USER_CONTRACT = os.getenv("KITE__USDC_CONTRACT_ADDRESS")
+CHAIN_ID = int(os.getenv("KITE__CHAIN_ID", "2368"))
+
+_required = {
+    "CONSUMER__PRIVATE_KEY": CONSUMER_KEY,
+    "CONSUMER__ADDRESS": CONSUMER_ADDRESS,
+    "KITE__USDC_CONTRACT_ADDRESS": USER_CONTRACT,
+}
+_missing = [k for k, v in _required.items() if not v]
+if _missing:
+    logger.error("ERROR: Missing required env vars: %s",", ".join(_missing))
+    sys.exit(1)
 
 
 def build_payment_header(payment_requirements: dict) -> str:
-    """Build and sign an x402 payment header from 402 response terms."""
+    """Build and sign an x402 payment header from 402 response terms.
+    Args:
+        payment_requirements: The 402 response body containing 'accepts' terms.
+        
+    Returns:
+        Base64-encoded signed payment payload.
+        
+    Raises:
+        KeyError: If payment_requirements is missing expected fields.
+        ValueError: If amount is not a valid integer.
+    """
     terms = payment_requirements["accepts"][0]
     amount = int(terms["maxAmountRequired"])
     payee = terms["payTo"]
@@ -106,60 +136,62 @@ def build_payment_header(payment_requirements: dict) -> str:
     return base64.b64encode(json.dumps(payload).encode()).decode()
 
 
-async def run_integration_tests():
-    print("\n" + "="*60)
-    print("AgentMemory — Server Integration Tests")
-    print("="*60)
+async def run_integration_tests() -> None:
+    logger.info("\n" + "="*60)
+    logger.info("MindMint — Server Integration Tests")
+    logger.info("="*60)
     
     passed = 0
     failed = 0
+    payment_requirements = None
     
     async with httpx.AsyncClient(timeout=15.0) as client:
         
         # Test 1: Health check
-        print("\n[TEST 1] Health check...")
+        logger.info("\n[TEST 1] Health check...")
         r = await client.get(f"{SERVER_URL}/health")
         if r.status_code == 200 and r.json().get("status") == "ok":
-            print("   ✅ PASS — Server is healthy")
+            logger.info("   PASS — Server is healthy")
             passed += 1
         else:
-            print(f"   ❌ FAIL — Expected 200, got {r.status_code}")
-            print("   Is the server running? uvicorn backend.main:app --reload")
+            logger.error("   FAIL — Expected 200, got %s",r.status_code)
+            logger.info("   Body: %s", r.text)
+            logger.info("   Is the server running? uvicorn backend.main:app --reload")
             failed += 1
-            return  # Can't continue without server
+            return  
         
         # Test 2: Free route
-        print("\n[TEST 2] Free route (no payment)...")
+        logger.info("\n[TEST 2] Free route (no payment)...")
         r = await client.get(f"{SERVER_URL}/memory/list")
         if r.status_code == 200:
             bundles = r.json().get("bundles", [])
-            print(f"   ✅ PASS — Got {len(bundles)} bundles")
+            logger.info("   PASS — Got %d bundles", len(bundles))
             passed += 1
         else:
-            print(f"   ❌ FAIL — Expected 200, got {r.status_code}")
+            logger.error("   FAIL — Expected 200, got %s", r.status_code)
             failed += 1
         
         # Test 3: Paid route without payment header
-        print("\n[TEST 3] Paid route without payment (expecting 402)...")
+        logger.info("\n[TEST 3] Paid route without payment (expecting 402)...")
         r = await client.get(f"{SERVER_URL}/memory/purchase/test-bundle-001")
         if r.status_code == 402:
             body = r.json()
             if "accepts" in body:
-                print("   ✅ PASS — Got 402 with payment requirements")
-                print(f"   Required: {int(body['accepts'][0]['maxAmountRequired']) / 1_000_000} USDC")
+                logger.info("   PASS — Got 402 with payment requirements")
+                logger.info("   Required: %.6f USDC",int(body['accepts'][0]['maxAmountRequired']) / 1_000_000)
                 passed += 1
                 payment_requirements = body
             else:
-                print("   ❌ FAIL — Got 402 but missing 'accepts' field")
+                logger.error("   FAIL — Got 402 but missing 'accepts' field")
                 failed += 1
                 payment_requirements = None
         else:
-            print(f"   ❌ FAIL — Expected 402, got {r.status_code}")
+            logger.error("   FAIL — Expected 402, got %s",r.status_code)
             failed += 1
             payment_requirements = None
         
         # Test 4: Paid route with valid payment
-        print("\n[TEST 4] Paid route with valid payment (expecting 200)...")
+        logger.info("\n[TEST 4] Paid route with valid payment (expecting 200)...")
         if payment_requirements:
             try:
                 payment_header = build_payment_header(payment_requirements)
@@ -168,44 +200,40 @@ async def run_integration_tests():
                     headers={"X-PAYMENT": payment_header}
                 )
                 if r.status_code == 200:
-                    content = r.json()
                     tx = r.headers.get("X-PAYMENT-RESPONSE", "not present")
-                    print("   ✅ PASS — Payment accepted, bundle received")
-                    print(f"   TX Hash: {tx[:30]}...")
+                    logger.info("   PASS — Payment accepted, bundle received")
+                    logger.info("   TX Hash: %s...",tx[:30])
                     passed += 1
                 else:
-                    print(f"   ❌ FAIL — Expected 200, got {r.status_code}")
-                    print(f"   Body: {r.text[:200]}")
+                    logger.error("   FAIL — Expected 200, got %s",r.status_code)
+                    logger.info("   Body: %s",r.text[:200])
                     failed += 1
-            except Exception as e:
-                print(f"   ❌ FAIL — Error building/sending payment: {e}")
+            except (httpx.HTTPError, KeyError, ValueError) as e:
+                logger.error("   FAIL — Error building/sending payment: %s", e)
                 failed += 1
         else:
-            print("   ⏭️  SKIP — Skipped because Test 3 failed")
+            logger.warning("   SKIP — Skipped because Test 3 failed")
         
-        # Test 5: Invalid payment header
-        print("\n[TEST 5] Invalid payment header (expecting 402)...")
+        logger.info("\n[TEST 5] Invalid payment header (expecting 402)...")
         r = await client.get(
             f"{SERVER_URL}/memory/purchase/test-bundle-001",
             headers={"X-PAYMENT": "this-is-not-a-valid-payment"}
         )
         if r.status_code == 402:
-            print("   ✅ PASS — Invalid payment correctly rejected")
+            logger.info("   PASS — Invalid payment correctly rejected")
             passed += 1
         else:
-            print(f"   ❌ FAIL — Expected 402, got {r.status_code}")
+            logger.error("   FAIL — Expected 402, got %s",r.status_code)
             failed += 1
     
     # Summary
-    print("\n" + "="*60)
-    print(f"Results: {passed} passed, {failed} failed")
+    logger.info("\n" + "="*60)
+    logger.info("Results: %d passed, %d failed", passed, failed)
     if failed == 0:
-        print("✅ All tests passed — Phase 2 complete!")
-        print("   x402 payment gate is working inside the server.")
-        print("   Move to Phase 3.")
+        logger.info("All tests passed")
     else:
-        print("❌ Some tests failed. Fix the issues above before proceeding.")
-    print("="*60 + "\n")
+        logger.info("Some tests failed. Fix the issues above before proceeding.")
+    logger.info("="*60 + "\n")
 
 
 if __name__ == "__main__":
