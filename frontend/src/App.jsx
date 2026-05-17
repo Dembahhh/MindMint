@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import MarketplacePage from './pages/MarketplacePage';
+import MarketplacePage from './pages/MarketPlacePage';
 import AgentPage from './pages/AgentPage';
 import DashboardPage from './pages/DashboardPage';
 import NotFoundPage from './pages/NotFoundPage';
