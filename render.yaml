@@ -12,9 +12,9 @@ services:
       - key: DATABASE__MONGODB_DB_NAME
         value: MindMint
       - key: DATABASE__CHROMA_HOST
-        sync: false
+        value: chromadb-nlle.onrender.com
       - key: DATABASE__CHROMA_PORT
-        value: "8001"
+        value: "443"
       - key: LLM__API_KEY
         sync: false
       - key: LLM__MODEL
