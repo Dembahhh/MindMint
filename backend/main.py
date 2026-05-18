@@ -133,7 +133,7 @@ app.add_middleware(
         settings.frontend_url or "",  
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Payment", "X-Payment-Response"],
 )
 
