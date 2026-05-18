@@ -1,11 +1,29 @@
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
-import { ErrorBoundary } from './components/ErrorBoundary';
-import MarketplacePage from './pages/MarketPlacePage';
-import AgentPage from './pages/AgentPage';
-import DashboardPage from './pages/DashboardPage';
-import NotFoundPage from './pages/NotFoundPage';
+import { BrowserRouter, Routes, Route, NavLink, Link } from "react-router-dom";
+import { useEffect } from "react";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import LandingPage from "./pages/LandingPage";
+import MarketplacePage from "./pages/MarketPlacePage";
+import AgentPage from "./pages/AgentPage";
+import DashboardPage from "./pages/DashboardPage";
+import NotFoundPage from "./pages/NotFoundPage";
+import { getHealth } from "./api";
+
+
+function useBackendWakeup() {
+  useEffect(() => {
+    getHealth().catch(() => {});
+  }, []);
+}
+
+const NAV_LINKS = [
+  { to: "/marketplace", label: "Marketplace" },
+  { to: "/agent", label: "Run Agent" },
+  { to: "/dashboard", label: "Dashboard" },
+];
 
 export default function App() {
+  useBackendWakeup();
+
   return (
     <ErrorBoundary>
       <BrowserRouter>
@@ -14,22 +32,24 @@ export default function App() {
             aria-label="Main navigation"
             className="border-b border-line px-6 py-4 flex items-center gap-8"
           >
-            <span className="text-xl font-bold text-accent-subtle">
-              <span aria-hidden="true">🧠 </span>MindMint
-            </span>
-            {[
-              { to: '/', label: 'Marketplace', end: true },
-              { to: '/agent', label: 'Run Agent' },
-              { to: '/dashboard', label: 'Dashboard' },
-            ].map(({ to, label, end }) => (
+            <Link
+              to="/"
+              className="text-xl font-bold text-accent-subtle hover:opacity-80
+                         transition-opacity focus:outline-none focus:ring-2
+                         focus:ring-accent rounded"
+              aria-label="MindMint — go to home"
+            >
+              <span aria-hidden="true"> </span>MindMint
+            </Link>
+
+            {NAV_LINKS.map(({ to, label }) => (
               <NavLink
                 key={to}
                 to={to}
-                end={end}
                 className={({ isActive }) =>
                   isActive
-                    ? 'text-accent-subtle font-medium'
-                    : 'text-ink-secondary hover:text-ink-primary transition-colors'
+                    ? "text-accent-subtle font-medium"
+                    : "text-ink-secondary hover:text-ink-primary transition-colors"
                 }
               >
                 {label}
@@ -39,10 +59,11 @@ export default function App() {
 
           <main>
             <Routes>
-              <Route path="/"          element={<MarketplacePage />} />
-              <Route path="/agent"     element={<AgentPage />} />
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/marketplace" element={<MarketplacePage />} />
+              <Route path="/agent" element={<AgentPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="*"          element={<NotFoundPage />} />
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </main>
         </div>

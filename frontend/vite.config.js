@@ -1,10 +1,20 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  root: '.',
+  root: ".",
   build: {
-    outDir: 'dist'
-  }
-})
+    sourcemap: false,
+    minify: "esbuild",
+    outDir: "dist",
+
+    rollupOptions: {
+      output: {
+        chunkFileNames: "assets/[hash].js",
+        entryFileNames: "assets/[hash].js",
+        assetFileNames: "assets/[hash][extname]",
+      },
+    },
+  },
+});
