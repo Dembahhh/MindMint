@@ -83,9 +83,11 @@ async def lifespan(app: FastAPI):
             host=settings.database.chroma_host,
             port=settings.database.chroma_port,
         )
+        _use_ssl = settings.database.chroma_port == 443
         chroma_client = chromadb.HttpClient(
             host=settings.database.chroma_host,
             port=settings.database.chroma_port,
+            ssl=_use_ssl,
         )
         app.state.chroma = chroma_client
         app.state.chroma_collection = await asyncio.to_thread(
@@ -94,7 +96,8 @@ async def lifespan(app: FastAPI):
             metadata={"hnsw:space": "cosine"},
         )
         app.state.memory_store = MemoryStore(app.state.chroma_collection)
-        logger.info("ChromaDB connected")
+        logger.info("ChromaDB connected (ssl=%s, host=%s, port=%s)",
+                    _use_ssl, settings.database.chroma_host, settings.database.chroma_port)
     except Exception as e:
         logger.critical("Failed to connect to ChromaDB: %s", e)
         raise
