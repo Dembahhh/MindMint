@@ -43,7 +43,7 @@ async def wait_for_chroma(host: str, port: int, retries: int = 10, delay: int = 
     makes a network call and will crash if ChromaDB is still waking up.
     """
     scheme = "https" if port == 443 else "http"
-    url = f"{scheme}://{host}:{port}/api/v1/heartbeat"
+    url = f"{scheme}://{host}:{port}/api/v2/heartbeat"
     logger.info("Waiting for ChromaDB at %s", url)  # visible in Render logs
     for attempt in range(1, retries + 1):
         try:
