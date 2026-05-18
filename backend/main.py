@@ -38,11 +38,13 @@ logger = logging.getLogger("MindMint")
 async def wait_for_chroma(host: str, port: int, retries: int = 10, delay: int = 6) -> None:
     """Ping ChromaDB's heartbeat endpoint until it responds or retries are exhausted.
 
-    Uses plain HTTP so it works with Render's internal networking (no SSL/443).
+    Uses HTTPS when port=443 (Render public URL), HTTP otherwise (internal/local).
     Must be called *before* chromadb.HttpClient() because the constructor itself
     makes a network call and will crash if ChromaDB is still waking up.
     """
-    url = f"http://{host}:{port}/api/v1/heartbeat"
+    scheme = "https" if port == 443 else "http"
+    url = f"{scheme}://{host}:{port}/api/v1/heartbeat"
+    logger.info("Waiting for ChromaDB at %s", url)  # visible in Render logs
     for attempt in range(1, retries + 1):
         try:
             async with httpx.AsyncClient() as client:
