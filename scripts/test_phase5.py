@@ -85,7 +85,6 @@ async def run_tests() -> None:
 
     async with httpx.AsyncClient(timeout=90.0) as client:
 
-        # Setup: Publish test bundle
         logger.info("[SETUP] Publishing test bundle...")
         pub_r = await client.post(
             f"{SERVER_URL}/memory/publish",
@@ -103,7 +102,6 @@ async def run_tests() -> None:
         bundle_id = pub_r.json().get("bundle_id", "")
         logger.info("[SETUP] Published bundle %s...", bundle_id[:20])
 
-        # Setup: Trigger a purchase via Consumer Agent
         logger.info("[SETUP] Triggering consumer agent purchase...")
         run_r = await client.post(
             f"{SERVER_URL}/agent/consumer/run",
@@ -117,7 +115,6 @@ async def run_tests() -> None:
         logger.info("[SETUP] Consumer purchased %d bundle(s)", len(bundles_bought))
         await asyncio.sleep(0.5)
 
-        # Test 1: Royalty payment records created
         logger.info("[TEST 1] Royalty payment records exist...")
         dash_r = await client.get(f"{SERVER_URL}/dashboard/publisher/{PUBLISHER_WALLET}")
         if dash_r.status_code == 200:
@@ -135,7 +132,6 @@ async def run_tests() -> None:
             logger.error("   FAIL — Dashboard returned %s", dash_r.status_code)
             failed += 1
 
-        # Test 2: 80/20 royalty split is mathematically correct
         logger.info("[TEST 2] Royalty split is 80/20...")
         if dashboard_data:
             earned = dashboard_data.get("total_earned_usdc", 0)
@@ -162,7 +158,6 @@ async def run_tests() -> None:
             logger.warning("   SKIP — Dashboard data unavailable")
             passed += 1
 
-        # Test 3: Publisher dashboard has correct fields
         logger.info("[TEST 3] Publisher dashboard has correct fields...")
         if dashboard_data:
             missing_fields = [f for f in REQUIRED_DASHBOARD_FIELDS if f not in dashboard_data]
@@ -176,7 +171,6 @@ async def run_tests() -> None:
             logger.error("   FAIL — Dashboard data unavailable")
             failed += 1
 
-        # Test 4: Platform stats endpoint
         logger.info("[TEST 4] Platform stats endpoint...")
         plat_r = await client.get(f"{SERVER_URL}/dashboard/platform")
         if plat_r.status_code == 200:
@@ -194,7 +188,6 @@ async def run_tests() -> None:
             logger.error("   FAIL — Platform endpoint returned %s", plat_r.status_code)
             failed += 1
 
-        # Test 5: Marketplace listing
         logger.info("[TEST 5] Marketplace listing returns bundles...")
         market_r = await client.get(
             f"{SERVER_URL}/dashboard/marketplace",
@@ -217,7 +210,6 @@ async def run_tests() -> None:
             logger.error("   FAIL — Marketplace returned %s", market_r.status_code)
             failed += 1
 
-        # Test 6: Bundle rating endpoint
         logger.info("[TEST 6] Bundle rating endpoint...")
         if bundle_id:
             rate_r = await client.post(
@@ -242,7 +234,6 @@ async def run_tests() -> None:
             logger.warning("   SKIP — No bundle_id available from setup")
             failed += 1
 
-        # Test 7: Publisher leaderboard
         logger.info("[TEST 7] Publisher leaderboard has entries...")
         board_r = await client.get(f"{SERVER_URL}/dashboard/leaderboard")
         if board_r.status_code == 200:

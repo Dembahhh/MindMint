@@ -7,7 +7,7 @@ This script demonstrates the full payment loop:
   GET protected resource → 402 → pay → GET with receipt → 200
 
 If this script runs successfully, the entire payment infrastructure
-for AgentMemory is confirmed working.
+for MindMint is confirmed working.
 """
 
 import asyncio
@@ -39,15 +39,12 @@ CONSUMER_ADDRESS = os.getenv("CONSUMER_WALLET_ADDRESS")
 CONSUMER_KEY = os.getenv("CONSUMER_PRIVATE_KEY")
 USDC_ADDRESS = os.getenv("USDC_CONTRACT_ADDRESS")
 
-# Kite's example paid endpoint on testnet (confirmed in their docs)
 TEST_ENDPOINT = "https://api.testnet.gokite.ai/x402/example"
 
-# ── Web3 Setup ───────────────────────────────────────────────────────────────
 
 w3 = Web3(Web3.HTTPProvider(RPC_URL))
 consumer_account = Account.from_key(CONSUMER_KEY)
 
-# Minimal ERC-20 ABI for USDC balance check
 ERC20_ABI = [
     {
         "inputs": [{"name": "account", "type": "address"}],
@@ -74,7 +71,6 @@ ERC20_ABI = [
     }
 ]
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
 
 def check_usdc_balance() -> float:
     """Check consumer wallet USDC balance on testnet."""
@@ -86,7 +82,7 @@ def check_usdc_balance() -> float:
         raw_balance = usdc.functions.balanceOf(
             Web3.to_checksum_address(CONSUMER_ADDRESS)
         ).call()
-        return raw_balance / 1_000_000  # USDC has 6 decimals
+        return raw_balance / 1_000_000 
     except Exception as e:
         print(f"   Could not check balance: {e}")
         return -1
@@ -107,13 +103,11 @@ def sign_x402_payment(payment_terms: dict) -> str:
     
     amount = int(payment_terms["maxAmountRequired"])
     payee = payment_terms["payTo"]
-    
-    # EIP-712 typed data for transferWithAuthorization
+
     valid_after = 0
-    valid_before = int(time.time()) + 300  # Valid for 5 minutes
+    valid_before = int(time.time()) + 300  
     nonce = "0x" + secrets.token_hex(32)
     
-    # Build the EIP-712 domain + message
     domain = {
         "name": "USD Coin",
         "version": "2",
@@ -129,8 +123,7 @@ def sign_x402_payment(payment_terms: dict) -> str:
         "validBefore": valid_before,
         "nonce": nonce
     }
-    
-    # Sign using eth_account structured data
+
     structured_data = {
         "types": {
             "EIP712Domain": [
@@ -158,7 +151,6 @@ def sign_x402_payment(payment_terms: dict) -> str:
         full_message=structured_data
     )
     
-    # Build x402 payment payload
     payment_payload = {
         "x402Version": 1,
         "scheme": "exact",
@@ -176,19 +168,16 @@ def sign_x402_payment(payment_terms: dict) -> str:
         }
     }
     
-    # Encode as base64 for the X-PAYMENT header
     return base64.b64encode(
         json.dumps(payment_payload).encode()
     ).decode()
 
-#Main Flow
 
 async def run_x402_test():
     print("\n" + "="*60)
-    print("AgentMemory — x402 Payment Test")
+    print("MindMint — x402 Payment Test")
     print("="*60)
     
-    # Check connectivity
     print("\n[1/5] Checking Kite Testnet connectivity...")
     if w3.is_connected():
         block = w3.eth.block_number
@@ -197,7 +186,6 @@ async def run_x402_test():
         print("   ❌ Cannot connect to Kite RPC. Check KITE_RPC_URL in .env")
         sys.exit(1)
     
-    # Check USDC balance
     print("\n[2/5] Checking Consumer wallet USDC balance...")
     balance = check_usdc_balance()
     if balance > 0:
@@ -210,7 +198,6 @@ async def run_x402_test():
     
     async with httpx.AsyncClient(timeout=30.0) as client:
         
-        # Step 1: Hit the protected endpoint without payment
         print(f"\n[3/5] Requesting protected endpoint (expecting 402)...")
         print(f"   URL: {TEST_ENDPOINT}")
         
@@ -233,7 +220,6 @@ async def run_x402_test():
             print(f"   Body: {response.text}")
             sys.exit(1)
         
-        # Step 2: Sign payment
         print("\n[4/5] Signing x402 payment...")
         try:
             signed_payment = sign_x402_payment(terms)
@@ -242,7 +228,6 @@ async def run_x402_test():
             print(f"   ❌ Signing failed: {e}")
             sys.exit(1)
         
-        # Step 3: Retry with payment
         print("\n[5/5] Retrying request with payment receipt...")
         paid_response = await client.get(
             TEST_ENDPOINT,

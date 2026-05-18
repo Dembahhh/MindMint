@@ -73,7 +73,6 @@ async def run_tests() -> None:
 
     async with httpx.AsyncClient(timeout=90.0) as client:
 
-        # Setup: Publish test bundle
         logger.info("[SETUP] Publishing test bundle...")
         pub_r = await client.post(
             f"{SERVER_URL}/memory/publish",
@@ -99,7 +98,6 @@ async def run_tests() -> None:
 
         await asyncio.sleep(1)
 
-        # Test 1: Search finds the published bundle
         logger.info("[TEST 1] Search finds published bundle...")
         search_r = await client.get(
             f"{SERVER_URL}/memory/search",
@@ -121,7 +119,6 @@ async def run_tests() -> None:
             logger.error("   FAIL — Search returned %s", search_r.status_code)
             failed += 1
 
-        # Test 2: Consumer agent runs task
         logger.info("[TEST 2] Consumer agent runs task...")
         task_r = await client.post(
             f"{SERVER_URL}/agent/consumer/run",
@@ -138,7 +135,6 @@ async def run_tests() -> None:
             )
             failed += 1
 
-        # Test 3: Agent purchased at least one bundle
         logger.info("[TEST 3] Agent autonomously purchased memories...")
         bundles_bought = run_data.get("bundles_purchased", [])
         if bundles_bought:
@@ -154,7 +150,6 @@ async def run_tests() -> None:
             logger.warning("   Check similarity/quality thresholds against the test bundle.")
             failed += 1
 
-        # Test 4: Answer is non-empty and substantive
         logger.info("[TEST 4] Agent generated a substantive answer...")
         answer = run_data.get("answer", "")
         if answer and len(answer) > 100:
@@ -165,7 +160,6 @@ async def run_tests() -> None:
             logger.error("   FAIL — Answer too short or empty: %s", answer[:80])
             failed += 1
 
-        # Test 5: Answer references specific facts from purchased memories
         logger.info("[TEST 5] Answer references specific facts from purchased memories...")
         facts_found = [f for f in SPECIFIC_FACTS if f.lower() in answer.lower()]
         if len(facts_found) >= 2:
@@ -178,7 +172,6 @@ async def run_tests() -> None:
             )
             passed += 1
 
-        # Test 6: Purchase count incremented on the bundle
         logger.info("[TEST 6] Bundle purchase count incremented...")
         if bundle_id:
             info_r = await client.get(f"{SERVER_URL}/memory/info/{bundle_id}")

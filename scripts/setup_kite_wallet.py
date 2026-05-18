@@ -37,9 +37,9 @@ def generate_wallet(name: str) -> WalletInfo:
     Raises:
         ValueError: If key generation or account derivation fails.
     """
-    PRIVATE_KEY_BYTES = 32  # 256 bits for EVM private key
+    PRIVATE_KEY_BYTES = 32 
     try:
-        private_key = "0x" + secrets.token_hex(PRIVATE_KEY_BYTES) #pragma: allowlist secret
+        private_key = "0x" + secrets.token_hex(PRIVATE_KEY_BYTES)
         account= Account.from_key(private_key)
     except  ValueError as e:
         raise ValueError(f"Failed to generate wallet for {name}: {e}") from e
@@ -48,7 +48,7 @@ def generate_wallet(name: str) -> WalletInfo:
 
 if __name__ == "__main__":
     logger.info("\n" + "="*60)
-    logger.info("AGENTMEMORY — Wallet Generation")
+    logger.info("MindMint — Wallet Generation")
     logger.info("="*60)
     logger.info(" SAVE THESE VALUES IN YOUR .env FILE")
     logger.info("  NEVER SHARE OR COMMIT PRIVATE KEYS")

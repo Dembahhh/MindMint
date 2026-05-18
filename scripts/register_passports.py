@@ -82,7 +82,6 @@ def _require_env(key: str) -> str:
         sys.exit(1)
     return value
 
-#Core logic
 
 async def register_passport(
     credentials: WalletCredentials,
@@ -97,7 +96,7 @@ async def register_passport(
 
     Args:
         credentials:           Wallet address and private key for the agent.
-        agent_name:            Human-readable name (e.g. "AgentMemory Publisher").
+        agent_name:            Human-readable name (e.g. "MindMint Publisher").
         agent_role:            Role identifier (e.g. "publisher" or "consumer").
         daily_spend_limit_usdc: Maximum USDC the agent may spend per day.
 
@@ -116,13 +115,12 @@ async def register_passport(
             "allowedNetworks": ["kite-testnet"],
         },
         "metadata": {
-            "project": "AgentMemory",
-            "description": f"AgentMemory {agent_role} agent",
+            "project": "MindMint",
+            "description": f"MindMint {agent_role} agent",
             "version": "0.1.0",
         },
     }
 
-    # Sign the serialised payload to prove the caller controls this wallet
     message = encode_defunct(text=json.dumps(payload, sort_keys=True))
     account = Account.from_key(credentials.private_key)
     signed = account.sign_message(message)
@@ -177,7 +175,7 @@ async def main() -> None:
             address=_require_env("PUBLISHER__ADDRESS"),
             private_key=_require_env("PUBLISHER__PRIVATE_KEY"),
         ),
-        agent_name="AgentMemory Publisher",
+        agent_name="MindMint Publisher",
         agent_role="publisher",
     )
 
@@ -186,7 +184,7 @@ async def main() -> None:
             address=_require_env("CONSUMER__ADDRESS"),
             private_key=_require_env("CONSUMER__PRIVATE_KEY"),
         ),
-        agent_name="AgentMemory Consumer",
+        agent_name="MindMint Consumer",
         agent_role="consumer",
     )
 

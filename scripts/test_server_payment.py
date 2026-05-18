@@ -147,7 +147,6 @@ async def run_integration_tests() -> None:
     
     async with httpx.AsyncClient(timeout=15.0) as client:
         
-        # Test 1: Health check
         logger.info("\n[TEST 1] Health check...")
         r = await client.get(f"{SERVER_URL}/health")
         if r.status_code == 200 and r.json().get("status") == "ok":
@@ -160,7 +159,6 @@ async def run_integration_tests() -> None:
             failed += 1
             return  
         
-        # Test 2: Free route
         logger.info("\n[TEST 2] Free route (no payment)...")
         r = await client.get(f"{SERVER_URL}/memory/list")
         if r.status_code == 200:
@@ -171,7 +169,6 @@ async def run_integration_tests() -> None:
             logger.error("   FAIL — Expected 200, got %s", r.status_code)
             failed += 1
         
-        # Test 3: Paid route without payment header
         logger.info("\n[TEST 3] Paid route without payment (expecting 402)...")
         r = await client.get(f"{SERVER_URL}/memory/purchase/test-bundle-001")
         if r.status_code == 402:
@@ -189,8 +186,7 @@ async def run_integration_tests() -> None:
             logger.error("   FAIL — Expected 402, got %s",r.status_code)
             failed += 1
             payment_requirements = None
-        
-        # Test 4: Paid route with valid payment
+
         logger.info("\n[TEST 4] Paid route with valid payment (expecting 200)...")
         if payment_requirements:
             try:
@@ -226,7 +222,6 @@ async def run_integration_tests() -> None:
             logger.error("   FAIL — Expected 402, got %s",r.status_code)
             failed += 1
     
-    # Summary
     logger.info("\n" + "="*60)
     logger.info("Results: %d passed, %d failed", passed, failed)
     if failed == 0:
