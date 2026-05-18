@@ -10,7 +10,7 @@ services:
       - key: DATABASE__MONGO_DB_URL
         sync: false
       - key: DATABASE__MONGODB_DB_NAME
-        value: agentmemory
+        value: MindMint
       - key: DATABASE__CHROMA_HOST
         sync: false
       - key: DATABASE__CHROMA_PORT
