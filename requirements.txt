@@ -19,4 +19,4 @@ eth-account
 
 nh3==0.2.15
 
-python-dotenv
+python-dotenvchromadb==1.5.9
