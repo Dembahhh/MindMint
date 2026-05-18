@@ -16,6 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import chromadb
+import httpx
 import logging
 import asyncio
 import google.generativeai as genai
@@ -34,6 +35,34 @@ logging.basicConfig(
 logger = logging.getLogger("MindMint")
 
 
+async def wait_for_chroma(host: str, port: int, retries: int = 10, delay: int = 6) -> None:
+    """Ping ChromaDB's heartbeat endpoint until it responds or retries are exhausted.
+
+    Uses plain HTTP so it works with Render's internal networking (no SSL/443).
+    Must be called *before* chromadb.HttpClient() because the constructor itself
+    makes a network call and will crash if ChromaDB is still waking up.
+    """
+    url = f"http://{host}:{port}/api/v1/heartbeat"
+    for attempt in range(1, retries + 1):
+        try:
+            async with httpx.AsyncClient() as client:
+                r = await client.get(url, timeout=10)
+                if r.status_code == 200:
+                    logger.info("ChromaDB is awake after %d attempt(s)", attempt)
+                    return
+                logger.warning(
+                    "ChromaDB heartbeat returned %d (attempt %d/%d)",
+                    r.status_code, attempt, retries
+                )
+        except Exception as e:
+            logger.warning("ChromaDB not ready (attempt %d/%d): %s", attempt, retries, e)
+        await asyncio.sleep(delay)
+    raise RuntimeError(
+        f"ChromaDB did not respond after {retries} attempts at {url}. "
+        "Check that DATABASE__CHROMA_HOST and DATABASE__CHROMA_PORT are set correctly."
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Runs on startup and shutdown."""
@@ -50,16 +79,19 @@ async def lifespan(app: FastAPI):
     logger.info("Gemini API configured with model: %s", settings.llm.model)
 
     try:
-        chroma_client = chromadb.HttpClient(
-        host=settings.database.chroma_host,
-        port=settings.database.chroma_port
+        await wait_for_chroma(
+            host=settings.database.chroma_host,
+            port=settings.database.chroma_port,
         )
-        await asyncio.to_thread(chroma_client.heartbeat)
+        chroma_client = chromadb.HttpClient(
+            host=settings.database.chroma_host,
+            port=settings.database.chroma_port,
+        )
         app.state.chroma = chroma_client
         app.state.chroma_collection = await asyncio.to_thread(
-        chroma_client.get_or_create_collection,
-        name=settings.database.chroma_collection_name,
-        metadata={"hnsw:space": "cosine"}
+            chroma_client.get_or_create_collection,
+            name=settings.database.chroma_collection_name,
+            metadata={"hnsw:space": "cosine"},
         )
         app.state.memory_store = MemoryStore(app.state.chroma_collection)
         logger.info("ChromaDB connected")
