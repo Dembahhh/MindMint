@@ -119,7 +119,7 @@ class X402PaymentMiddleware(BaseHTTPMiddleware):
                         "network": "kite-testnet",
                         "maxAmountRequired": str(price_microunits),
                         "resource": str(request.url),
-                        "description": "AgentMemory bundle access",
+                        "description": "MindMint bundle access",
                         "mimeType": "application/json",
                         "payTo": settings.publisher.address,
                         "maxTimeoutSeconds": 300,

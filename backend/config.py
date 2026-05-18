@@ -40,7 +40,7 @@ class LLMConfig(BaseModel):
     embedding_dim: int = 768
 class DatabaseConfig(BaseModel):   
     mongo_db_url: str = "mongodb://localhost:27017"
-    mongodb_db_name: str = "agentmemory"
+    mongodb_db_name: str = "MindMint"
     chroma_host: str = "localhost"
     chroma_port: Annotated[int, Field(gt=0, lt=65536)] = 8000
     chroma_collection_name: str = "memory_bundles"
@@ -79,6 +79,7 @@ class Settings(BaseSettings):
     marketplace: MarketplaceConfig = MarketplaceConfig()
     api: APIConfig = APIConfig()
     agent: AgentConfig = AgentConfig()
+    environment: str = "development"
 
     # Top-level env vars (not nested)
     demo_api_key: Optional[str] = None

@@ -149,6 +149,14 @@ async def purchase_bundle(bundle_id: str, request: Request) -> dict[str, Any]:
             status_code=409,
             detail="This transaction has already been used to purchase a bundle"
         )
+    record = PaymentRecord(
+        bundle_id=bundle_id,
+        tx_hash=payment["tx_hash"],
+        payer=payer,
+        payee=bundle.publisher_wallet,
+        amount_microunits=payment["amount_microunits"],
+        local_only=payment.get("localVerificationOnly", False)
+    )
     try:
         await record.insert()
         await store.increment_purchase_count(bundle_id) 
@@ -165,14 +173,6 @@ async def purchase_bundle(bundle_id: str, request: Request) -> dict[str, Any]:
         gross_amount_microunits=bundle.price_microunits
     )
 
-    record = PaymentRecord(
-        bundle_id=bundle_id,
-        tx_hash=payment["tx_hash"],
-        payer=payer,
-        payee=bundle.publisher_wallet,
-        amount_microunits=payment["amount_microunits"],
-        local_only=payment.get("localVerificationOnly", False)
-    )
     try:
         await record.insert()
         await store.increment_purchase_count(bundle_id)

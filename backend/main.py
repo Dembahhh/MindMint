@@ -92,6 +92,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",   
         "http://localhost:3000",  
+        "https://mindmint-ui.onrender.com",
         settings.frontend_url or "",  
     ],
     allow_credentials=True,
