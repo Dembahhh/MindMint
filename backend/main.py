@@ -35,32 +35,32 @@ logging.basicConfig(
 logger = logging.getLogger("MindMint")
 
 
-async def wait_for_chroma(host: str, port: int, retries: int = 10, delay: int = 6) -> None:
-    """Ping ChromaDB's heartbeat endpoint until it responds or retries are exhausted.
-
-    Uses HTTPS when port=443 (Render public URL), HTTP otherwise (internal/local).
-    Must be called *before* chromadb.HttpClient() because the constructor itself
-    makes a network call and will crash if ChromaDB is still waking up.
+async def wait_for_chroma(max_attempts: int = 30, base_delay: float = 3.0) -> None:
     """
-    scheme = "https" if port == 443 else "http"
-    url = f"{scheme}://{host}:{port}/api/v2/heartbeat"
-    logger.info("Waiting for ChromaDB at %s", url)  # visible in Render logs
-    for attempt in range(1, retries + 1):
-        try:
-            async with httpx.AsyncClient() as client:
-                r = await client.get(url, timeout=10)
-                if r.status_code == 200:
-                    logger.info("ChromaDB is awake after %d attempt(s)", attempt)
+    Polls ChromaDB heartbeat with exponential backoff.
+    Handles Render free-tier cold starts (can take 50-90 seconds).
+    """
+    scheme = "https" if settings.database.chroma_port == 443 else "http"
+    url = f"{scheme}://{settings.database.chroma_host}:{settings.database.chroma_port}/api/v2/heartbeat"
+    logger.info("Waiting for ChromaDB at %s", url)
+
+    async with httpx.AsyncClient(timeout=10.0, verify=True) as client:
+        for attempt in range(1, max_attempts + 1):
+            try:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    logger.info("ChromaDB ready after %d attempt(s).", attempt)
                     return
-                logger.warning(
-                    "ChromaDB heartbeat returned %d (attempt %d/%d)",
-                    r.status_code, attempt, retries
-                )
-        except Exception as e:
-            logger.warning("ChromaDB not ready (attempt %d/%d): %s", attempt, retries, e)
-        await asyncio.sleep(delay)
+                logger.warning("[Attempt %d/%d] ChromaDB returned %d", attempt, max_attempts, resp.status_code)
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
+                logger.warning("[Attempt %d/%d] ChromaDB not ready: %s", attempt, max_attempts, e)
+
+            delay = min(base_delay * (1.5 ** (attempt - 1)), 15.0)
+            logger.info("Retrying in %.1fs...", delay)
+            await asyncio.sleep(delay)
+
     raise RuntimeError(
-        f"ChromaDB did not respond after {retries} attempts at {url}. "
+        f"ChromaDB did not respond after {max_attempts} attempts at {url}. "
         "Check that DATABASE__CHROMA_HOST and DATABASE__CHROMA_PORT are set correctly."
     )
 
@@ -68,6 +68,7 @@ async def wait_for_chroma(host: str, port: int, retries: int = 10, delay: int = 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Runs on startup and shutdown."""
+    await wait_for_chroma()
     logger.info("MindMint starting up...")
     
     try:
@@ -81,10 +82,7 @@ async def lifespan(app: FastAPI):
     logger.info("Gemini API configured with model: %s", settings.llm.model)
 
     try:
-        await wait_for_chroma(
-            host=settings.database.chroma_host,
-            port=settings.database.chroma_port,
-        )
+        await wait_for_chroma()
         _use_ssl = settings.database.chroma_port == 443
         chroma_client = chromadb.HttpClient(
             host=settings.database.chroma_host,
