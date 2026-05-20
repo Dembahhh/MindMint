@@ -122,6 +122,8 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.add_middleware(X402PaymentMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -132,10 +134,9 @@ app.add_middleware(
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Payment", "X-Payment-Response"],
+    allow_headers=["Authorization", "Content-Type", "X-Payment", "X-Payment-Response", "X-API-Key"],
 )
 
-app.add_middleware(X402PaymentMiddleware)
 
 app.include_router(memory_router, prefix="/memory", tags=["Memory"])
 app.include_router(agent_router, prefix="/agent", tags=["Agent"])
