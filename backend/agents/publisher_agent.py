@@ -21,8 +21,13 @@ import asyncio
 import logging
 import json
 
-import google.generativeai as genai
-import google.api_core.exceptions
+# -- Groq (text generation) --
+from groq import AsyncGroq
+
+# -- Gemini (kept for reference; now only used in embedder.py) --
+# import google.generativeai as genai
+# import google.api_core.exceptions
+# _model = genai.GenerativeModel(settings.llm.model)
 
 from backend.utils.limits import PUBLISHER_TOPIC_MAX_CHARS, LOG_PREVIEW_CHARS
 from backend.config import settings
@@ -32,7 +37,7 @@ from backend.utils.gemini import strip_markdown_fences
 
 logger = logging.getLogger(__name__)
 
-_model = genai.GenerativeModel(settings.llm.model)
+_groq = AsyncGroq(api_key=settings.llm.groq_api_key.get_secret_value())
 
 
 MEMORY_GENERATION_PROMPT = """
@@ -95,10 +100,9 @@ class PublisherAgent:
         count: int = 8
     ) -> list[str]:
         """
-        Uses Gemini to generate realistic synthetic memories.
+        Uses Groq to generate realistic synthetic memories.
         In production this would be replaced by real interaction capture.
         """
-        
         prompt = MEMORY_GENERATION_PROMPT.format(
             domain=domain,
             domain_context=domain_context,
@@ -106,27 +110,24 @@ class PublisherAgent:
         )
         
         try:
-            response = await _model.generate_content_async(
-                prompt,
-                generation_config={
-                    "temperature": 0.8,    
-                    "max_output_tokens": 2000,
-                    "top_k": 40,
-                    "top_p": 0.95,
-                }
+            #  response = await _model.generate_content_async(prompt, generation_config={"temperature": 0.8, "max_output_tokens": 2000, "top_k": 40, "top_p": 0.95})
+            #  raw = strip_markdown_fences(response.text.strip())
+            #  except google.api_core.exceptions.GoogleAPIError as e:
+            response = await _groq.chat.completions.create(
+                model=settings.llm.model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=2000,
+                temperature=0.8,
             )
-            
-            raw = strip_markdown_fences(response.text.strip())
-            
+            raw = strip_markdown_fences(response.choices[0].message.content.strip())
+
             memories = json.loads(raw)
             logger.info("Generated %d memories for domain: %s", len(memories), domain)
             return memories
         
-        except google.api_core.exceptions.GoogleAPIError as e:
-            logger.error("[publisher] Gemini API error for domain '%s': %s", domain[:PUBLISHER_TOPIC_MAX_CHARS], e)
-            return []
-        except (json.JSONDecodeError, ValueError) as e:
-            logger.error("[publisher] Parse error for '%s': %s", domain[:PUBLISHER_TOPIC_MAX_CHARS], e)
+        except Exception as e:
+            #  except google.api_core.exceptions.GoogleAPIError as e:
+            logger.error("[publisher] LLM error for domain '%s': %s", domain[:PUBLISHER_TOPIC_MAX_CHARS], e)
             return []
 
     async def publish_bundle(

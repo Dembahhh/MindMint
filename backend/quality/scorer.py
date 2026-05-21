@@ -1,7 +1,7 @@
 """
 quality/scorer.py
 
-Scores agent memories for quality using Gemini Flash.
+Scores agent memories for quality using Groq (was: Gemini Flash).
 
 Quality = how USEFUL is this memory to another agent?
 
@@ -24,10 +24,16 @@ Low quality (0.0–0.4):
 Memories below QUALITY_THRESHOLD are not stored.
 """
 
-import google.generativeai as genai
+# -- Groq (text generation) --
+from groq import AsyncGroq
+
+# -- Gemini (kept for reference; now only used in embedder.py) --
+# import google.generativeai as genai
+# import google.api_core.exceptions
+# _model = genai.GenerativeModel(settings.llm.model)
+
 import json
 import logging
-import google.api_core.exceptions
 import asyncio
 from typing import Any
 
@@ -39,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 QUALITY_THRESHOLD: float = settings.marketplace.quality_threshold
 
-_model = genai.GenerativeModel(settings.llm.model)
+_groq = AsyncGroq(api_key=settings.llm.groq_api_key.get_secret_value())
 
 
 SCORING_PROMPT = """
@@ -56,11 +62,11 @@ Score this memory from 0.0 to 1.0 based on:
 4. ACCURACY — Does the reasoning appear sound?
 
 Respond with ONLY a JSON object in this exact format:
-{
+{{
   "score": 0.75,
   "reasoning": "One sentence explaining the score",
   "tags": ["tag1", "tag2", "tag3"]
-}
+}}
 
 The tags should be 2-5 topic labels like: DeFi, Ethereum, liquidation, arbitrage, Kite, x402, payment, trading, etc.
 Do not include any text outside the JSON object.
@@ -82,15 +88,16 @@ async def score_memory(memory_text: str) -> dict[str, Any]:
     try:
         prompt = SCORING_PROMPT.format(memory_text=memory_text[:SCORER_MAX_MEMORY_CHARS])
         
-        response = await _model.generate_content_async(
-            prompt,
-            generation_config={
-                "temperature": 0.1,     
-                "max_output_tokens": 200
-            }
+        #  response = await _model.generate_content_async(prompt, generation_config={"temperature": 0.1, "max_output_tokens": 200})
+        #  raw = strip_markdown_fences(response.text.strip())
+        #  except google.api_core.exceptions.GoogleAPIError as e:
+        response = await _groq.chat.completions.create(
+            model=settings.llm.model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=200,
+            temperature=0.1,
         )
-        
-        raw = strip_markdown_fences(response.text.strip())
+        raw = strip_markdown_fences(response.choices[0].message.content.strip())
         
         result = json.loads(raw)
         score = float(result.get("score", 0.0))
@@ -109,17 +116,10 @@ async def score_memory(memory_text: str) -> dict[str, Any]:
             "passes_threshold": score >= QUALITY_THRESHOLD
         }
         
-    except google.api_core.exceptions.GoogleAPIError as e:
-        logger.warning("[scorer] Gemini API error: %s. Failing open", e)
-        return {
-            "score": 0.5,
-            "reasoning": str(e),
-            "tags": [],
-            "passes_threshold": True,
-            "unscored": True
-        }
-    except (json.JSONDecodeError, KeyError) as e:
-        logger.warning("[scorer] Error parsing Gemini response: %s. Failing open", e)
+    except Exception as e:
+        #  except google.api_core.exceptions.GoogleAPIError as e:
+        #  except (json.JSONDecodeError, KeyError) as e:
+        logger.warning("[scorer] Error scoring memory: %s. Failing open", e)
         return {
             "score": 0.5,
             "reasoning": str(e),

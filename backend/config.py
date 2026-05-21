@@ -35,7 +35,8 @@ class WalletConfig(BaseModel):
 
 class LLMConfig(BaseModel):    
     api_key: SecretStr
-    model: str = "gemini-1.5-flash"
+    groq_api_key: SecretStr
+    model: str = "llama-3.3-70b-versatile"
     embedding_model: str = "models/text-embedding-004"
     embedding_dim: int = 768
 class DatabaseConfig(BaseModel):   
@@ -43,6 +44,7 @@ class DatabaseConfig(BaseModel):
     mongodb_db_name: str = "MindMint"
     chroma_host: str = "localhost"
     chroma_port: Annotated[int, Field(gt=0, lt=65536)] = 8000
+    chroma_ssl: bool = False
     chroma_collection_name: str = "memory_bundles"
     chroma_doc_max_length: int = 500
     

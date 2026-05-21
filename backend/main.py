@@ -40,7 +40,7 @@ async def wait_for_chroma(max_attempts: int = 30, base_delay: float = 3.0) -> No
     Polls ChromaDB heartbeat with exponential backoff.
     Handles Render free-tier cold starts (can take 50-90 seconds).
     """
-    scheme = "https" if settings.database.chroma_port == 443 else "http"
+    scheme = "https" if settings.database.chroma_ssl else "http"
     url = f"{scheme}://{settings.database.chroma_host}:{settings.database.chroma_port}/api/v2/heartbeat"
     logger.info("Waiting for ChromaDB at %s", url)
 
@@ -77,13 +77,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error("Failed to connect to MongoDB: %s", e)
         raise
-
+    
     genai.configure(api_key=settings.llm.api_key.get_secret_value())
-    logger.info("Gemini API configured with model: %s", settings.llm.model)
+    logger.info("Gemini embeddings configured. LLM: Groq %s", settings.llm.model)
 
     try:
         await wait_for_chroma()
-        _use_ssl = settings.database.chroma_port == 443
+        _use_ssl = settings.database.chroma_ssl
         chroma_client = chromadb.HttpClient(
             host=settings.database.chroma_host,
             port=settings.database.chroma_port,

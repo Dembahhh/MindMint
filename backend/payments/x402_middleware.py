@@ -53,6 +53,8 @@ class X402PaymentMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next) -> Response:
         path = request.url.path
+        if request.method == "OPTIONS":
+            return await call_next(request)
 
         if not any(path.startswith(prefix) for prefix in PAID_ROUTE_PREFIXES):
             return await call_next(request)

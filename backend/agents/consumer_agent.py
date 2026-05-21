@@ -3,7 +3,7 @@ agents/consumer_agent.py
 
 Autonomous Consumer Agent that:
   1. Receives a task from a human or system
-  2. Plans search queries using Gemini
+  2. Plans search queries using Groq (was: Gemini)
   3. Searches the memory marketplace
   4. Evaluates results and decides what to buy
   5. Makes x402 payments autonomously
@@ -26,8 +26,11 @@ from dataclasses import dataclass, field
 from typing import Optional, Any
 import httpx
 
-import google.generativeai as genai
-import google.api_core.exceptions
+from groq import AsyncGroq
+
+# import google.generativeai as genai
+# import google.api_core.exceptions
+# _model = genai.GenerativeModel(settings.llm.model)
 
 from backend.config import settings
 from backend.payments.client import pay_for_resource
@@ -36,11 +39,26 @@ from backend.utils.limits import LOG_PREVIEW_CHARS, CONSUMER_TASK_MAX_CHARS
 
 logger = logging.getLogger(__name__)
 
-_model = genai.GenerativeModel(settings.llm.model)
+_groq = AsyncGroq(api_key=settings.llm.groq_api_key.get_secret_value())
 
 SIMILARITY_THRESHOLD = settings.agent.similarity_threshold
 QUALITY_THRESHOLD = settings.agent.quality_threshold
 MAX_BUNDLES_PER_RUN = settings.agent.max_bundles_per_run
+
+
+async def _groq_complete(
+    prompt: str,
+    max_tokens: int = 200,
+    temperature: float = 0.3
+) -> str:
+    """Helper: single-turn Groq completion."""
+    response = await _groq.chat.completions.create(
+        model=settings.llm.model,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    return response.choices[0].message.content.strip()
 
 
 @dataclass
@@ -137,25 +155,23 @@ class ConsumerAgent:
     
     async def _plan_queries(self, task: str) -> list[str]:
         """
-        Uses Gemini to generate focused search queries from a task description.
+        Uses Groq to generate focused search queries from a task description.
         Generating multiple queries improves recall — different phrasings
         find different bundles.
         """
         try:
             prompt = QUERY_PLANNING_PROMPT.format(task=task)
-            response = await _model.generate_content_async(
-                prompt,
-                generation_config={"temperature": 0.3, "max_output_tokens": 200}
+            #  response = await _model.generate_content_async(prompt, generation_config={"temperature": 0.3, "max_output_tokens": 200})
+            #  raw = strip_markdown_fences(response.text.strip())
+            raw = strip_markdown_fences(
+                await _groq_complete(prompt, max_tokens=200, temperature=0.3)
             )
-            raw = strip_markdown_fences(response.text.strip())
             queries = json.loads(raw)
             logger.info("[consumer] Generated %d search queries", len(queries))
-            return queries[:3] 
-        except google.api_core.exceptions.GoogleAPIError as e:
-            logger.warning("[consumer] Query planning Gemini error: %s", e)
-            return [task[:CONSUMER_TASK_MAX_CHARS]]
-        except (json.JSONDecodeError, ValueError) as e:
-            logger.warning("[consumer] Query planning parse error: %s", e)
+            return queries[:3]
+        except Exception as e:
+            #  except google.api_core.exceptions.GoogleAPIError as e:
+            logger.warning("[consumer] Query planning error: %s", e)
             return [task[:CONSUMER_TASK_MAX_CHARS]]
         
     async def _search_marketplace(
@@ -168,7 +184,6 @@ class ConsumerAgent:
         Deduplicates results across queries by bundle_id.
         Returns all unique results sorted by similarity.
         """
-        
         seen = {}        
         async with httpx.AsyncClient(timeout=30.0) as client:
             for query in queries:
@@ -200,7 +215,7 @@ class ConsumerAgent:
         Decides whether to buy a bundle using rule-based + LLM evaluation.
         
         First applies fast rule-based checks (similarity, quality thresholds).
-        If rules pass, asks Gemini to evaluate the preview vs the task.
+        If rules pass, asks Groq to evaluate the preview vs the task.
         
         Returns (should_buy: bool, reason: str)
         """
@@ -214,7 +229,7 @@ class ConsumerAgent:
             return False, f"Quality {quality:.2f} below threshold {QUALITY_THRESHOLD}"
         
         price_microunits = result.get(
-            "price_microunits",(settings.marketplace.memory_base_price_usdc*1_000_000)
+            "price_microunits", (settings.marketplace.memory_base_price_usdc * 1_000_000)
         )
         price_usdc = price_microunits / 1_000_000
         
@@ -230,13 +245,12 @@ class ConsumerAgent:
                 preview=result.get("best_matching_memory_preview", "")[:200]
             )
             
-            response = await _model.generate_content_async(
-                prompt,
-                generation_config={"temperature": 0.1, "max_output_tokens": 100}
+            #  response = await _model.generate_content_async(prompt, generation_config={"temperature": 0.1, "max_output_tokens": 100})
+            #  raw = strip_markdown_fences(response.text.strip())
+            raw = strip_markdown_fences(
+                await _groq_complete(prompt, max_tokens=100, temperature=0.1)
             )
-            
-            raw = strip_markdown_fences(response.text.strip())
-                    
+
             decision = json.loads(raw)
             should_buy = decision.get("buy", False)
             reason = decision.get("reason", "")
@@ -248,12 +262,11 @@ class ConsumerAgent:
             )
             
             return should_buy, reason
-        except google.api_core.exceptions.GoogleAPIError as e:
-            logger.warning("[consumer] Purchase decision Gemini error: %s", e)
-            return similarity > 0.78 and quality > 0.65, "Rule-based fallback (Gemini unavailable)"
-        except (json.JSONDecodeError, ValueError, KeyError) as e:
-            logger.warning("[consumer] Purchase decision parse error: %s", e)
-            return similarity > 0.78 and quality > 0.65, "Rule-based fallback (parse error)"
+
+        except Exception as e:
+            #  except google.api_core.exceptions.GoogleAPIError as e:
+            logger.warning("[consumer] Purchase decision error: %s", e)
+            return similarity > 0.78 and quality > 0.65, "Rule-based fallback (LLM unavailable)"
     
     async def _purchase_bundle(self, bundle_id: str) -> Optional[dict]:
         """
@@ -283,7 +296,7 @@ class ConsumerAgent:
     
     def _build_memories_context(self, bundles: list[PurchasedBundle]) -> str:
         """
-        Formats purchased memories for injection into the Gemini context.
+        Formats purchased memories for injection into the Groq context.
         
         Structure:
           [Bundle 1: Title]
@@ -312,7 +325,7 @@ class ConsumerAgent:
         purchased_bundles: list[PurchasedBundle]
     ) -> str:
         """
-        Generates the final answer using Gemini, informed by purchased memories.
+        Generates the final answer using Groq, informed by purchased memories.
         """
         memories_context = self._build_memories_context(purchased_bundles)
         
@@ -325,18 +338,15 @@ class ConsumerAgent:
             )
         
         try:
-            response = await _model.generate_content_async(
-                prompt,
-                generation_config={
-                    "temperature": 0.4,
-                    "max_output_tokens": 1000
-                }
-            )
-            return response.text.strip()
-        
-        except google.api_core.exceptions.GoogleAPIError as e:
-            logger.error("[consumer] Answer generation Gemini error: %s", e)
-            return f"Error generating answer: Gemini unavailable ({e})"
+            #  response = await _model.generate_content_async(prompt, generation_config={"temperature": 0.4, "max_output_tokens": 1000})
+            #  return response.text.strip()
+            #  except google.api_core.exceptions.GoogleAPIError as e:
+            #  return f"Error generating answer: Gemini unavailable ({e})"
+            return await _groq_complete(prompt, max_tokens=1000, temperature=0.4)
+
+        except Exception as e:
+            logger.error("[consumer] Answer generation error: %s", e)
+            return f"Error generating answer: LLM unavailable ({e})"
 
     
     async def run(self, task: str) -> ConsumerRunResult:
@@ -365,7 +375,7 @@ class ConsumerAgent:
             logger.info("[consumer] No marketplace results found. Answering from general knowledge.")
         
         for candidate in search_results:
-            price_microunits = candidate.get("price_microunits",(settings.marketplace.memory_base_price_usdc*1_000_000))
+            price_microunits = candidate.get("price_microunits", (settings.marketplace.memory_base_price_usdc * 1_000_000))
             price_usdc = price_microunits / 1_000_000
             
             if spent + price_usdc > self.max_budget_usdc:
