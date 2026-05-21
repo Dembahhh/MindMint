@@ -7,7 +7,7 @@ pymongo==4.6.3
 
 chromadb==1.0.0
 
-httpx>=0.26.0
+httpx==0.28.1
 
 pydantic
 pydantic-settings
@@ -20,4 +20,4 @@ eth-account
 nh3==0.2.15
 
 python-dotenv
-groq==0.9.0
+groq==0.13.1
