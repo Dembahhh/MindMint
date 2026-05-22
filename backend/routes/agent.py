@@ -2,9 +2,10 @@
 routes/agent.py
 
 Agent identity and status routes.
-/agent/publisher  - Publisher agent info
-/agent/consumer   - Consumer agent info
-/agent/seed-demo  - Seeds the marketplace with demo bundles (one-time setup)
+/agent/publisher      - Publisher agent info
+/agent/consumer       - Consumer agent info
+/agent/seed-demo      - Seeds the marketplace with demo bundles (one-time setup)
+/agent/cleanup-zero   - Deletes bundles with zero price (bad seed data)
 """
 from typing import Any
 
@@ -13,6 +14,7 @@ from fastapi.security import APIKeyHeader
 
 from backend.config import settings
 from backend.agents.publisher_agent import PublisherAgent
+from backend.memory.bundle import MemoryBundle
 
 router = APIRouter()
 
@@ -49,6 +51,32 @@ async def consumer_info() -> dict[str, Any]:
     }
 
 
+@router.post("/cleanup-zero", dependencies=[Depends(_require_api_key)])
+async def cleanup_zero_price_bundles() -> dict[str, Any]:
+    """
+    Deletes all bundles with price_microunits == 0.
+    Use this to clean up bundles seeded before the pricing fix.
+    Requires X-API-KEY header in production.
+    """
+    try:
+        bad_bundles = await MemoryBundle.find(
+            MemoryBundle.price_microunits == 0
+        ).to_list()
+
+        count = len(bad_bundles)
+
+        for bundle in bad_bundles:
+            await bundle.delete()
+
+        return {
+            "status": "ok",
+            "deleted": count,
+            "message": f"Deleted {count} zero-price bundles. Run /agent/seed-demo to reseed."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cleanup failed: {e}")
+
+
 @router.post("/seed-demo", dependencies=[Depends(_require_api_key)])
 async def seed_demo_marketplace(request: Request) -> dict[str, Any]:
     """
@@ -75,6 +103,7 @@ async def seed_demo_marketplace(request: Request) -> dict[str, Any]:
                 "title": b.title,
                 "memory_count": len(b.memories),
                 "avg_quality_score": b.avg_quality_score,
+                "price_usdc": round(b.price_microunits / 1_000_000, 6),
             }
             for b in bundles
         ]

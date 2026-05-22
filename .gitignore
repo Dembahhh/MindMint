@@ -5,6 +5,7 @@
 .env.development
 .env.test
 .env.example
+.env.render
 frontend/.env
 backend/.env
 venv/
