@@ -159,7 +159,7 @@ async def get_marketplace_listings(
     elif sort == "popular":
         query = query.sort("-purchase_count")
     elif sort == "cheapest":
-        query = query.sort("+price_usdc")
+        query = query.sort("+price_microunits")
     else:
         query = query.sort("-id")
 
@@ -171,7 +171,7 @@ async def get_marketplace_listings(
             title=b.title,
             description=b.description,
             publisher_wallet=b.publisher_wallet,
-            price_usdc=float(b.price_usdc or 0.002),
+            price_usdc=round(b.price_microunits / 1_000_000, 6),
             memory_count=len(b.memories),
             avg_quality_score=b.avg_quality_score,
             purchase_count=b.purchase_count,
